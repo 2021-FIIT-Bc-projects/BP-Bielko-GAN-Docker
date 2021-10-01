@@ -1,4 +1,6 @@
 FROM jupyter/scipy-notebook
+ENV GRANT_SUDO=yes
+
 COPY requirements.txt requirements.txt
 
 #dependencies

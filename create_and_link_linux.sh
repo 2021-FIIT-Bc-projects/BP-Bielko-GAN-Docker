@@ -1,0 +1,1 @@
+docker run -it -v %cd%\training:/home/jovyan/training --name=gan_notebook_linked -p 8888:8888 bielko_gan_jupyter
