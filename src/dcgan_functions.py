@@ -111,7 +111,7 @@ def generate_fake_samples(generator, x_input, n_dim, n):  # [-1,1]
 
 def eval_performance(gan_model, generator, discriminator, losses, metadata_list, init_time,
                      n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9):
-    x_real, y_real = generate_real_samples_random(n)
+    x_real, y_real = generate_real_samples_random(n, 0, dataset_size)
     _, acc_real = discriminator.evaluate(x_real, y_real, verbose=0)
 
     input_points = random_latent_points(n_dim, n)
