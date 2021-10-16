@@ -64,7 +64,7 @@ def generate_real_samples(i_start, n):
     # print(image_array)
 
 
-def generate_real_samples_random(n, i_min, i_max, dataset_path):
+def generate_real_samples_random(n, i_min, i_max):
     picked_sample_list = list()
     for i_image in range(n):
         chosen_sample = random.choice(range(i_min, i_max))
@@ -192,7 +192,7 @@ def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
     init_time = datetime.datetime.now()
 
 
-    for epoch in range(from_epoch, n_epochs):
+    for epoch in range(start_epoch, n_epochs):
         start_n = 0  # pozicia v datasete pre epoch
         for i in range(batches):
             print(f"[Epoch {epoch}] Batch {i}/{batches}")
@@ -220,7 +220,7 @@ def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
 
 
 def show_dataset():
-    x_plt, _ = generate_real_samples_random(16)
+    x_plt, _ = generate_real_samples_random(16, 0, dataset_size)
     n_factor = 3  # 4x4
     fig = plt.figure(figsize=(6, 6))
     fig.subplots_adjust(wspace=0, hspace=0)
