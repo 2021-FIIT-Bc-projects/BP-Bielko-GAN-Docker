@@ -8,6 +8,8 @@ import random
 from PIL import Image
 import datetime # testing
 
+model_type = "0_to_1_leakyReLU_tanh_x64"
+
 default_width = 64
 default_height = 64
 pixel_depth = 3
