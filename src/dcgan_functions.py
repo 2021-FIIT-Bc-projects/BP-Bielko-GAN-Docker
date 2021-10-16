@@ -191,6 +191,7 @@ def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
 
     init_time = datetime.datetime.now()
 
+
     for epoch in range(from_epoch, n_epochs):
         start_n = 0  # pozicia v datasete pre epoch
         for i in range(batches):
@@ -211,8 +212,9 @@ def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
 
             if i % n_eval == 0:
                 losses = (d_loss_real, d_loss_fake, g_loss)
+                inputs = random_latent_points(n_dim, plot_size)
                 eval_performance(gan_model, generator, discriminator, losses, metadata_list, init_time,
-                                 n_dim, epoch, n_epochs, i, batches, n=eval_samples, n_plot=n_plot, plot_size=plot_size)
+                                 n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot, plot_size=plot_size)
 
             start_n += half_batch;
 
