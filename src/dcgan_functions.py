@@ -18,6 +18,9 @@ dataset_size = 70000
 dataset_path = "/content/ffhq-dataset/thumbnails128x128"
 output_path = "/content/drive/My Drive/gan_files"
 
+real_sample_dict = {}
+
+
 def rgb_to_float(rgb_value):
     zero_to_one = rgb_value / 256.0
     # normalized = (zero_to_one - 0.5) * 2
@@ -30,9 +33,6 @@ def float_to_rgb(float_value):
     rgb_value = np.where(rgb_value > 255, 255, rgb_value)
     rgb_value = np.where(rgb_value < 0, 0, rgb_value).astype('uint8')
     return rgb_value
-
-
-real_sample_dict = {}
 
 
 def generate_real_samples(i_start, n):
@@ -138,7 +138,7 @@ def eval_performance(gan_model, generator, discriminator, losses, metadata_list,
 
     metadata_list.append(
         [
-            time_taken.seconds / 3600,  # float hodnota kolko hodin od startu
+            i_epoch * n_bacthes + i_batch,  # poradove cislo batch
             losses[0],
             losses[1],
             losses[2],
@@ -215,7 +215,7 @@ def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
 
             if i % n_eval == 0:
                 losses = (d_loss_real, d_loss_fake, g_loss)
-                inputs = random_latent_points(n_dim, plot_size)
+                inputs = random_latent_points(n_dim, plot_size) # TODO daj inam
                 eval_performance(gan_model, generator, discriminator, losses, metadata_list, init_time,
                                  n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot, plot_size=plot_size)
 
