@@ -1,8 +1,19 @@
 # definicie funkcii
 
+import numpy as np
+import math
+from matplotlib import pyplot as plt
+from skimage.transform import resize
+import random
+from PIL import Image
+import datetime # testing
+
 default_width = 64
 default_height = 64
 pixel_depth = 3
+
+dataset_size = 70000
+dataset_path = '/content/ffhq-dataset/thumbnails128x128'
 
 def rgb_to_float(rgb_value):
     zero_to_one = rgb_value / 256.0
@@ -16,6 +27,9 @@ def float_to_rgb(float_value):
     rgb_value = np.where(rgb_value > 255, 255, rgb_value)
     rgb_value = np.where(rgb_value < 0, 0, rgb_value).astype('uint8')
     return rgb_value
+
+
+real_sample_dict = {}
 
 
 def generate_real_samples(i_start, n):
@@ -50,7 +64,7 @@ def generate_real_samples(i_start, n):
     # print(image_array)
 
 
-def generate_real_samples_random(n, i_min=0, i_max=dataset_size):
+def generate_real_samples_random(n, i_min, i_max, dataset_path):
     picked_sample_list = list()
     for i_image in range(n):
         chosen_sample = random.choice(range(i_min, i_max))
@@ -83,17 +97,6 @@ def generate_real_samples_random(n, i_min=0, i_max=dataset_size):
     # print(image_array)
 
 
-def generate_noise_samples(n):
-    samples = list()
-    for i_sample in range(n):
-        random_array = np.random.randint(0, high=255, size=default_height * default_width * pixel_depth)
-        random_array = random_array.reshape(default_height, default_width, pixel_depth)
-        samples.append(random_array)
-    X = np.array(samples)  # .reshape(n, (default_height, default_width, pixel_depth))
-    y = np.zeros((n, 1))
-    return X, y
-
-
 def random_latent_points(n_dim, n):
     latent_vectors = np.random.randn(n_dim * n)  # n čísel z gauss. distrib.
     latent_vectors = latent_vectors.reshape(n, n_dim)
@@ -106,32 +109,8 @@ def generate_fake_samples(generator, x_input, n_dim, n):  # [-1,1]
     return X, y
 
 
-def train_discriminator_noise(model, n_iter=1000, n_batch=128):
-    half_batch = int(n_batch / 2)
-
-    for i in range(n_iter):
-        X_real, y_real = generate_real_samples_random(half_batch)
-        X_real = rgb_to_float(X_real.astype('float32'))
-        model.train_on_batch(X_real, y_real)
-
-        X_fake, y_fake = generate_noise_samples(half_batch)
-        X_fake = rgb_to_float(X_fake.astype('float32'))
-        model.train_on_batch(X_fake, y_fake)
-
-        _, accuracy_real = model.evaluate(X_real, y_real, verbose=0)
-        _, accuracy_fake = model.evaluate(X_fake, y_fake, verbose=0)
-
-        print(i, '\nReal', accuracy_real, '\nFake', accuracy_fake)
-
-
-p_dims = 100
-p_n = 100
-predetermined_inputs = np.random.randn(p_dims * p_n)  # n vektorov z gauss. distrib.
-predetermined_inputs = predetermined_inputs.reshape(p_n, p_dims)
-
-
 def eval_performance(gan_model, generator, discriminator, losses, metadata_list, init_time,
-                     n_dim, i_epoch, n_epochs, i_batch, n_batches, n=25, n_plot=10, plot_size=9):
+                     n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9):
     x_real, y_real = generate_real_samples_random(n)
     _, acc_real = discriminator.evaluate(x_real, y_real, verbose=0)
 
@@ -167,7 +146,6 @@ def eval_performance(gan_model, generator, discriminator, losses, metadata_list,
 
     if i_batch % n_plot == 0:
         # n_factor = math.sqrt(n)
-        inputs = predetermined_inputs
         fig = generate_and_plot(generator, n_dim, inputs, plot_size)
         epoch_padding_size = 8  # len(str(n_epochs-1))
         batch_padding_size = 8  # len(str(n_batches-1))
@@ -204,7 +182,7 @@ def eval_performance(gan_model, generator, discriminator, losses, metadata_list,
         # plt.close(fig)
 
 
-def train_gan(gan_model, generator, discriminator, metadata_list,
+def train_gan(gan_model, generator, discriminator, dataset_size, metadata_list,
               n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
               plot_size=9):
     # diskriminator updatujeme so vstupmi v pocte n_batch, pol. real, pol. fake

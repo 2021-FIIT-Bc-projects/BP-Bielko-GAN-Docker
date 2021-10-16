@@ -1,4 +1,5 @@
 tensorflow==2.6.0
-keras==2.6.0
-tensorflow_datasets==4.4.0
-scikit-image==1.19.5
+numpy
+matplotlib
+scikit-image
+Pillow

@@ -1,5 +1,16 @@
 # definicie modelu
 
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, \
+                         Conv2D, \
+                         LeakyReLU, \
+                         Dropout, \
+                         Flatten, \
+                         Reshape, \
+                         Conv2DTranspose
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import initializers, optimizers
+
 default_width = 64
 default_height = 64
 pixel_depth = 3
