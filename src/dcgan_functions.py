@@ -13,7 +13,8 @@ default_height = 64
 pixel_depth = 3
 
 dataset_size = 70000
-dataset_path = '/content/ffhq-dataset/thumbnails128x128'
+dataset_path = "/content/ffhq-dataset/thumbnails128x128"
+output_path = "/content/drive/My Drive/gan_files"
 
 def rgb_to_float(rgb_value):
     zero_to_one = rgb_value / 256.0
