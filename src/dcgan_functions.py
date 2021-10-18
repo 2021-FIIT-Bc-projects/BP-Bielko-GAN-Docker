@@ -138,7 +138,7 @@ def eval_performance(gan_model, generator, discriminator, losses, metadata_list,
 
     metadata_list.append(
         [
-            i_epoch * n_bacthes + i_batch,  # poradove cislo batch
+            i_epoch * n_batches + i_batch,  # poradove cislo batch
             losses[0],
             losses[1],
             losses[2],
