@@ -281,24 +281,24 @@ class Discriminator:
 
 class Generator:
     
-    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=128, pixel_depth=3):
+    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=128, pixel_depth=3, init_size=8):
         self.height = default_height
         self.width = default_width
         self.model = Sequential()
 
         first_layer = Dense(
-            units=4 * 4 * n_paralell_samples,
+            units=init_size * init_size * n_paralell_samples,
             input_dim=n_dim,
             # activation='linear'
         )
         first_activation = LeakyReLU(alpha=0.2)
-        reshape = Reshape((4, 4, n_paralell_samples))
+        reshape = Reshape((init_size, init_size, n_paralell_samples))
 
         self.model.add(first_layer)
         self.model.add(first_activation)
         self.model.add(reshape)
 
-        current_size = 4
+        current_size = init_size
         while current_size < self.height:
             new_layer = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
                 filters=n_paralell_samples,
