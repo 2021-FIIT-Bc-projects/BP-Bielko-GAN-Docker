@@ -9,7 +9,6 @@ from tensorflow.keras.layers import Dense, \
                          Reshape, \
                          Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras import initializers, optimizers
 
 from os import stat, mkdir, path
@@ -26,7 +25,7 @@ from PIL import Image
 #output_path = "/content/drive/My Drive/gan_files"
 
 class GAN:
-    def __init__(self, generator, discriminator, width=64, height=64, model_name="dcgan_tanh_x64", output_path="", dataset_size=70000):
+    def __init__(self, generator, discriminator, height=64, width=64, model_name="dcgan_tanh_x64", output_path="", dataset_size=70000):
         self.dataset_size = dataset_size
     
         model_directory = path.join(output_path, model_name)
@@ -150,51 +149,44 @@ class GAN:
         
 class Discriminator():
     def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path=''):
-        self.real_gen = ImageDataGenerator(horizontal_flip=True)
         self.dataset_path = dataset_path
-        self.height = default_height;
-        self.width = default_width;
+        self.height = default_height
+        self.width = default_width
 
-        input_shape = (self.height, self.width, pixel_depth)
 
         self.model = Sequential()
-    
         first_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
             filters=n_filters,
             kernel_size=(3, 3),  # ^^
             strides=(2, 2),
             padding='same',
-            input_shape=input_shape
+            input_shape=(self.height, self.width, pixel_depth)
         )
         first_activation = LeakyReLU(alpha=0.2)
         first_dropout = Dropout(0.1)
-    
-        second_layer = Conv2D(
-            filters=n_filters * 2,
-            kernel_size=(3, 3),
-            strides=(2, 2),
-            padding='same',
-        )
-        second_activation = LeakyReLU(alpha=0.2)
-        second_dropout = Dropout(0.1)
-    
-        third_layer = Conv2D(
-            filters=n_filters * 4,
-            kernel_size=(3, 3),
-            strides=(2, 2),
-            padding='same',
-        )
-        third_activation = LeakyReLU(alpha=0.2)
-        third_dropout = Dropout(0.1)
-        
-        fourth_layer = Conv2D(
-            filters=n_filters * 4,
-            kernel_size=(3, 3),
-            strides=(2, 2),
-            padding='same',
-        )
-        fourth_activation = LeakyReLU(alpha=0.2)
-        fourth_dropout = Dropout(0.1)
+
+        self.model.add(first_layer)
+        self.model.add(first_activation)
+        self.model.add(first_dropout)
+
+        current_size = self.height // 2
+
+        while current_size > 4:
+            new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
+                filters=n_filters,
+                kernel_size=(3, 3),  # ^^
+                strides=(2, 2),
+                padding='same'
+            )
+            new_activation = LeakyReLU(alpha=0.2)
+            new_dropout = Dropout(0.1)
+
+            self.model.add(new_layer)
+            self.model.add(new_activation)
+            self.model.add(new_dropout)
+
+            current_size /= 2
+
         
         flatten = Flatten()
         dropout = Dropout(0.4)
@@ -202,22 +194,6 @@ class Discriminator():
             units=1,  # real/fake klasifikacia
             activation='sigmoid'
         )
-    
-        self.model.add(first_layer)
-        self.model.add(first_activation)
-        self.model.add(first_dropout)
-        
-        self.model.add(second_layer)
-        self.model.add(second_activation)
-        self.model.add(second_dropout)
-        
-        self.model.add(third_layer)
-        self.model.add(third_activation)
-        self.model.add(third_dropout)
-        
-        self.model.add(fourth_layer)
-        self.model.add(fourth_activation)
-        self.model.add(fourth_dropout)
     
         self.model.add(flatten)
         self.model.add(dropout)
@@ -305,59 +281,37 @@ class Discriminator():
 
 class Generator:
     
-    def generate_fake_samples(self, x_input, n_dim, n):  # [-1,1]
-        X = self.model.predict(x_input)
-        y = np.zeros((n, 1))
-        return X, y
-    
-    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=256, pixel_depth=3):
-        self.height = default_height;
-        self.width = default_width;
+    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=128, pixel_depth=3):
+        self.height = default_height
+        self.width = default_width
         self.model = Sequential()
 
         first_layer = Dense(
-            units=(default_height // 16) * (default_width // 16) * n_paralell_samples,
+            units=4 * 4 * n_paralell_samples,
             input_dim=n_dim,
             # activation='linear'
         )
         first_activation = LeakyReLU(alpha=0.2)
-        reshape = Reshape((default_height // 16, default_width // 16, n_paralell_samples))
+        reshape = Reshape((4, 4, n_paralell_samples))
 
-        first_upsample = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-            filters=n_paralell_samples // 2,
-            kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
-            strides=(2, 2),
-            # activation='linear',
-            padding='same',
-        )
-        first_upsample_activation = LeakyReLU(alpha=0.2)
+        self.model.add(first_layer)
+        self.model.add(first_activation)
+        self.model.add(reshape)
 
-        second_upsample = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-            filters=n_paralell_samples // 2,  # vygeneruje RGB values
-            kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
-            strides=(2, 2),
-            # activation='linear',
-            padding='same',
-        )
-        second_upsample_activation = LeakyReLU(alpha=0.2)
+        current_size = 4
+        while current_size < self.height:
+            new_layer = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
+                filters=n_paralell_samples,
+                kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
+                strides=(2, 2),
+                # activation='linear',
+                padding='same',
+            )
+            new_activation = LeakyReLU(alpha=0.2)
 
-        third_upsample = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-            filters=n_paralell_samples // 2,  # vygeneruje RGB values
-            kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
-            strides=(2, 2),
-            # activation='linear',
-            padding='same',
-        )
-        third_upsample_activation = LeakyReLU(alpha=0.2)
-
-        fourth_upsample = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-            filters=n_paralell_samples // 2,  # vygeneruje RGB values
-            kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
-            strides=(2, 2),
-            # activation='linear',
-            padding='same',
-        )
-        fourth_upsample_activation = LeakyReLU(alpha=0.2)
+            self.model.add(new_layer)
+            self.model.add(new_activation)
+            current_size *= 2
 
         output_layer = Conv2D(
             filters=pixel_depth,  # rgb info
@@ -365,20 +319,13 @@ class Generator:
             activation='tanh',  # specialna akt. funk. pre rgb
             padding='same'
         )
-
-        self.model.add(first_layer)
-        self.model.add(first_activation)
-        self.model.add(reshape)
-        self.model.add(first_upsample)
-        self.model.add(first_upsample_activation)
-        self.model.add(second_upsample)
-        self.model.add(second_upsample_activation)
-        self.model.add(third_upsample)
-        self.model.add(third_upsample_activation)
-        self.model.add(fourth_upsample)
-        self.model.add(fourth_upsample_activation)
-
         self.model.add(output_layer)
+
+    def generate_fake_samples(self, x_input, n_dim, n):  # [-1,1]
+        X = self.model.predict(x_input)
+        y = np.zeros((n, 1))
+        return X, y
+
 
 def rgb_to_float(rgb_value):
     zero_to_one = rgb_value / 256.0
