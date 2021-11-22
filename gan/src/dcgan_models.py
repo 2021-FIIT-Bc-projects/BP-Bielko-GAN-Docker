@@ -36,6 +36,7 @@ class GAN:
             mkdir(model_directory)
             mkdir(path.join(model_directory, "saves"))
             mkdir(path.join(model_directory, "outputs"))
+            mkdir(path.join(model_directory, "outputs", "evaluation"))
             mkdir(path.join(model_directory, "anim"))
 
         self.height = height
