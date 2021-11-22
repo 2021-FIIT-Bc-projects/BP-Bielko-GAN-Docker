@@ -170,10 +170,11 @@ class Discriminator:
         self.model.add(first_dropout)
 
         current_size = self.height // 2
+        filters_multiplier = 1
 
         while current_size > 4:
             new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
-                filters=n_filters,
+                filters=n_filters * filters_multiplier,
                 kernel_size=(3, 3),  # ^^
                 strides=(2, 2),
                 padding='same'
@@ -186,6 +187,7 @@ class Discriminator:
             self.model.add(new_dropout)
 
             current_size /= 2
+            filters_multiplier *= 2
 
         
         flatten = Flatten()
