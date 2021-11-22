@@ -1,1 +1,1 @@
-docker build . -t bielko_gan_jupyter
+call docker build . -t bielko_gan_jupyter
