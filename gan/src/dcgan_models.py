@@ -147,7 +147,7 @@ class GAN:
                 start_n += half_batch
         
         
-class Discriminator():
+class Discriminator:
     def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path=''):
         self.dataset_path = dataset_path
         self.height = default_height
