@@ -73,11 +73,12 @@ class GAN:
 
         time_taken = datetime.datetime.now() - init_time
 
+
         eval_string = f'''[Epoch {i_epoch}/{n_epochs}, Batch {i_batch}/{n_batches}]
         Time since start: {time_taken}
         Disc. loss real: {losses[0]}
         Disc. loss fake: {losses[1]}
-        Gen. loss: {losses[2]}
+        Gan loss: {losses[2]}
         Acc. real: {acc_real}
         Acc. fake: {acc_fake} (of {n} samples)
         '''

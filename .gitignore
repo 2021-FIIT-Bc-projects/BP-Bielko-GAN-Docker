@@ -1,3 +1,7 @@
 training/
 gan/dataset_download/
 gan/dcgan_128/
+gan/dcgan_32_test/
+gan/.ipynb_checkpoints/
+gan/src/_pycache_/
+gan/src/.ipynb_checkpoints/
