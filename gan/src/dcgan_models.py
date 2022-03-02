@@ -10,6 +10,7 @@ from tensorflow.keras.layers import Dense, \
                          Conv2DTranspose
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import initializers, optimizers
+from tensorflow.keras.applications import inception_v3
 
 from os import stat, mkdir, path
 
@@ -377,3 +378,23 @@ def latent_transition(pointA, pointB, n_dim=100, n_steps=100):
             transition_points[i][dim] = (pointB[dim] - pointA[dim]) * step + pointA[dim]
 
     return transition_points
+
+
+def fid_init(resolution):
+
+    model = InceptionV3(include_top=False, pooling="avg", input_shape=(resolution,resolution,3))
+    return model
+
+
+def fid_eval(sample, fid_model, eps=1E-16): # evaluate FID of a sample or set of samples via a model such as InceptionV3
+
+    sample = sample.astype("float32")
+    sample = inception_v3.preprocess_input(sample)
+
+    prediction = fid_model.predict(sample)
+    p_y = np.expand_dims(prediction.mean(axis=0), 0)
+    kl_d = prediction * (log(prediction + eps) - log(p_y + eps))
+    sum_kl_d = kl_d.sum(axis=1)
+    
+
+    return result_fid
