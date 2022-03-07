@@ -1,5 +1,4 @@
 # definicie modelu
-import os.path
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, \
                          Conv2D, \
@@ -12,7 +11,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import initializers, optimizers
 from tensorflow.keras.applications import inception_v3
 
-from os import stat, mkdir, path
+from os import stat, mkdir, path, listdir, remove
 
 import datetime # testing
 import numpy as np
@@ -65,7 +64,8 @@ class GAN:
     def eval_performance(self, losses, metadata_list, init_time,
                      n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9):
         
-        x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
+        # x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
+        x_real, y_real = self.discriminator.generate_real_samples(0, n, type=self.discriminator.dataset_type)
         _, acc_real = self.discriminator.model.evaluate(x_real, y_real, verbose=0)
 
         input_points = random_latent_points(n_dim, n)
@@ -113,7 +113,7 @@ class GAN:
 
     def train_gan(self, dataset_size, metadata_list,
                   n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
-                  plot_size=9):
+                  plot_size=9, type='face'):
         # diskriminator updatujeme so vstupmi v pocte n_batch, pol. real, pol. fake
         half_batch = n_batch // 2
         batches = dataset_size // half_batch
@@ -127,7 +127,7 @@ class GAN:
                 print(f"[Epoch {epoch}] Batch {i}/{batches}")
 
                 # vstup a target pre diskriminator
-                x_real, y_real = self.discriminator.generate_real_samples(start_n, half_batch)
+                x_real, y_real = self.discriminator.generate_real_samples(start_n, half_batch, type=self.discriminator.dataset_type)
                 input_points = random_latent_points(n_dim, half_batch)
                 x_fake, y_fake = self.generator.generate_fake_samples(input_points, n_dim, half_batch)
 
@@ -150,8 +150,9 @@ class GAN:
         
         
 class Discriminator:
-    def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path=''):
+    def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path='', dataset_type='face'):
         self.dataset_path = dataset_path
+        self.dataset_type = dataset_type
         self.height = default_height
         self.width = default_width
 
@@ -233,8 +234,8 @@ class Discriminator:
     #    X = self.real_gen.flow_from_directory(self.dataset_path, class_mode=None, batch_size=n)
     #    y = np.ones((n, 1))
     #    return X,y
-    
-    def generate_real_samples(self, i_start, n):
+
+    def generate_real_face_samples(self, i_start, n):
         picked_sample_list = list()
         for i_image in range(i_start, i_start + n):
             chosen_sample = i_image
@@ -256,6 +257,35 @@ class Discriminator:
         X = np.array(picked_sample_list)
         y = np.ones((n, 1))
         return X, y
+
+
+    def generate_real_avatar_samples(self, i_start, n):
+        picked_sample_list = list()
+        files = listdir(self.dataset_path)[i_start : i_start + n]
+
+        for file in files:
+            with Image.open(path.join(self.dataset_path, file)) as image:
+                background = Image.new('RGBA', image.size, (255,255,255))
+                alpha_composite = Image.alpha_composite(background, image).convert('RGB')
+                image_array = np.array(alpha_composite)
+
+                # exclude alpha channel
+            image_array = resize(image_array, (self.height, self.width))
+            picked_sample_list.append(image_array)
+
+        # after loading n samples:
+        X = np.array(picked_sample_list)
+        y = np.ones((n, 1))
+        return X, y
+
+
+    def generate_real_samples(self, i_start, n, type='face'):
+        loader = None
+        if type == 'face':
+            loader = self.generate_real_face_samples
+        elif type == 'avatar':
+            loader = self.generate_real_avatar_samples
+        return loader(i_start, n)
 
 
     def generate_real_samples_random(self, n, i_min, i_max):
