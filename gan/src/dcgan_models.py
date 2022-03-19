@@ -1,15 +1,18 @@
 # definicie modelu
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, \
-                         Conv2D, \
-                         LeakyReLU, \
-                         Dropout, \
-                         Flatten, \
-                         Reshape, \
-                         Conv2DTranspose
+                                    Conv2D, \
+                                    LeakyReLU, \
+                                    Dropout, \
+                                    Flatten, \
+                                    Reshape, \
+                                    Conv2DTranspose, \
+                                    BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import initializers, optimizers
-from tensorflow.keras.applications import inception_v3
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.inception_v3 import preprocess_input
+
 
 from os import stat, mkdir, path, listdir, remove
 
@@ -57,7 +60,10 @@ class GAN:
         
         self.generator = generator
         self.discriminator = discriminator
-        
+
+
+    def make_inception(self):
+        self.inception = InceptionV3()
         
 
     
@@ -111,6 +117,10 @@ class GAN:
             plt.close(fig)
 
 
+    def inception_eval(self):
+        return
+
+
     def train_gan(self, dataset_size, metadata_list,
                   n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
                   plot_size=9, type='face'):
@@ -143,12 +153,12 @@ class GAN:
                     losses = (d_loss_real, d_loss_fake, g_loss)
                     inputs = random_latent_points(n_dim, plot_size)
                     self.eval_performance(losses, metadata_list, init_time,
-                                     n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot, 
+                                     n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot,
                                      plot_size=plot_size)
 
                 start_n += half_batch
-        
-        
+
+
 class Discriminator:
     def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path='', dataset_type='face'):
         self.dataset_path = dataset_path
@@ -192,18 +202,18 @@ class Discriminator:
             current_size /= 2
             filters_multiplier *= 2
 
-        
+
         flatten = Flatten()
         dropout = Dropout(0.4)
         output_dense = Dense(
             units=1,  # real/fake klasifikacia
             activation='sigmoid'
         )
-    
+
         self.model.add(flatten)
         self.model.add(dropout)
         self.model.add(output_dense)
-    
+
         # model.summary()
         adam = Adam(lr=0.0002, beta_1=0.5)
         self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])  # metrics kvoli evaluation
@@ -240,19 +250,19 @@ class Discriminator:
         for i_image in range(i_start, i_start + n):
             chosen_sample = i_image
             chosen_folder = chosen_sample - (chosen_sample % 1000)
-    
+
             folder_string = str(chosen_folder)
             image_string = str(chosen_sample)
             folder_string = folder_string.rjust(5, '0')  # padding
             image_string = image_string.rjust(5, '0')  # padding
-    
+
             full_path = path.join(self.dataset_path, folder_string, image_string + '.png')
-    
+
             with Image.open(full_path) as image:
                 image_array = np.array(image)
             image_array = resize(image_array, (self.height, self.width))
             picked_sample_list.append(image_array)
-    
+
         # after loading n samples:
         X = np.array(picked_sample_list)
         y = np.ones((n, 1))
@@ -294,19 +304,19 @@ class Discriminator:
             chosen_sample = random.choice(range(i_min, i_max))
 
             chosen_folder = chosen_sample - (chosen_sample % 1000)
-    
+
             folder_string = str(chosen_folder)
             image_string = str(chosen_sample)
             folder_string = folder_string.rjust(5, '0')  # padding
             image_string = image_string.rjust(5, '0')  # padding
-    
+
             full_path = path.join(self.dataset_path, folder_string, image_string + '.png')
-    
+
             with Image.open(full_path) as image:
                 image_array = np.array(image)
             image_array = resize(image_array, (self.height, self.width))
             picked_sample_list.append(image_array)
-    
+
         # after loading n samples:
         X = np.array(picked_sample_list)  # .reshape(n, 1)
         y = np.ones((n, 1))
@@ -314,36 +324,58 @@ class Discriminator:
 
 
 class Generator:
-    
+
     def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=128, pixel_depth=3, init_size=8):
+        #changes:
+        # leakyrelu to default alpha, use_bias=False, added batch norms, kernel size to 5, add initial conv2dtransp
+        # dense size 128 -> 256, first conv 128, then all 64
+
         self.height = default_height
         self.width = default_width
         self.model = Sequential()
 
         first_layer = Dense(
-            units=init_size * init_size * n_paralell_samples,
+            units=init_size * init_size * 256,
             input_dim=n_dim,
+            use_bias=False,
             # activation='linear'
         )
-        first_activation = LeakyReLU(alpha=0.2)
+        first_norm = BatchNormalization()
+        first_activation = LeakyReLU()
         reshape = Reshape((init_size, init_size, n_paralell_samples))
 
+        init_conv = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
+            filters=n_paralell_samples,
+            kernel_size=(5, 5),
+            strides=(1, 1),
+            padding='same',
+            use_bias=False
+        )
+        init_norm = BatchNormalization()
+        init_activation = LeakyReLU()
+
         self.model.add(first_layer)
+        self.model.add(first_norm)
         self.model.add(first_activation)
         self.model.add(reshape)
+        self.model.add(init_conv)
+        self.model.add(init_norm)
+        self.model.add(init_activation)
 
         current_size = init_size
         while current_size < self.height:
             new_layer = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-                filters=n_paralell_samples,
-                kernel_size=(4, 4),  # idealne nasobok strides, inak moze nastat sachovnicovy vzor v convolution
+                filters=n_paralell_samples / 2,
+                kernel_size=(5, 5),
                 strides=(2, 2),
-                # activation='linear',
                 padding='same',
+                use_bias=False
             )
-            new_activation = LeakyReLU(alpha=0.2)
+            new_norm = BatchNormalization()
+            new_activation = LeakyReLU()
 
             self.model.add(new_layer)
+            self.model.add(new_norm)
             self.model.add(new_activation)
             current_size *= 2
 
@@ -351,7 +383,8 @@ class Generator:
             filters=pixel_depth,  # rgb info
             kernel_size=(3, 3),
             activation='tanh',  # specialna akt. funk. pre rgb
-            padding='same'
+            padding='same',
+            use_bias=False
         )
         self.model.add(output_layer)
 
@@ -425,6 +458,48 @@ def fid_eval(sample, fid_model, eps=1E-16): # evaluate FID of a sample or set of
     p_y = np.expand_dims(prediction.mean(axis=0), 0)
     kl_d = prediction * (log(prediction + eps) - log(p_y + eps))
     sum_kl_d = kl_d.sum(axis=1)
-    
+
 
     return result_fid
+
+
+
+# assumes images have the shape 299x299x3, pixels in [0,255]
+def calculate_inception_score(images, n_split=10, eps=1E-16):
+    # load inception v3 model
+    model = InceptionV3()
+    # convert from uint8 to float32
+    processed = images.astype('float32')
+    # pre-process raw images for inception v3 model
+    processed = preprocess_input(processed)
+    # predict class probabilities for images
+    yhat = model.predict(processed)
+    # enumerate splits of images/predictions
+    scores = list()
+    n_part = floor(images.shape[0] / n_split)
+    for i in range(n_split):
+        # retrieve p(y|x)
+        ix_start, ix_end = i * n_part, i * n_part + n_part
+        p_yx = yhat[ix_start:ix_end]
+        # calculate p(y)
+        p_y = expand_dims(p_yx.mean(axis=0), 0)
+        # calculate KL divergence using log probabilities
+        kl_d = p_yx * (log(p_yx + eps) - log(p_y + eps))
+        # sum over classes
+        sum_kl_d = kl_d.sum(axis=1)
+        # average over images
+        avg_kl_d = mean(sum_kl_d)
+        # undo the log
+        is_score = exp(avg_kl_d)
+        # store
+        scores.append(is_score)
+    # average across images
+    is_avg, is_std = mean(scores), std(scores)
+    return is_avg, is_std
+
+# pretend to load images
+images = ones((50, 299, 299, 3))
+print('loaded', images.shape)
+# calculate inception score
+is_avg, is_std = calculate_inception_score(images)
+print('score', is_avg, is_std)
