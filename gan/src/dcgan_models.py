@@ -342,7 +342,7 @@ class Generator:
         )
         first_norm = BatchNormalization()
         first_activation = LeakyReLU()
-        reshape = Reshape((init_size, init_size, n_paralell_samples))
+        reshape = Reshape((init_size, init_size, 256))
 
         init_conv = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
             filters=n_paralell_samples,
