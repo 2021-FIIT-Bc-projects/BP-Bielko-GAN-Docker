@@ -24,6 +24,8 @@ from skimage.transform import resize
 import random
 from PIL import Image
 
+import csv
+
 #dataset_path = "/content/ffhq-dataset/thumbnails128x128"
 #output_path = "/content/drive/My Drive/gan_files"
 
@@ -78,21 +80,26 @@ class GAN:
         x_fake, y_fake = self.generator.generate_fake_samples(input_points, n_dim, n)
         _, acc_fake = self.discriminator.model.evaluate(x_fake, y_fake, verbose=0)
 
-        time_taken = datetime.datetime.now() - init_time
+        batch_id = i_epoch * n_batches + i_batch
+        timestamp = datetime.datetime.now()
+        eval_row = [batch_id,
+                    timestamp,
+                    losses[0],
+                    losses[1],
+                    losses[2],
+                    acc_real,
+                    acc_fake,
+                    ]
 
-
-        eval_string = f'''[Epoch {i_epoch}/{n_epochs}, Batch {i_batch}/{n_batches}]
-        Time since start: {time_taken}
-        Disc. loss real: {losses[0]}
-        Disc. loss fake: {losses[1]}
-        Gan loss: {losses[2]}
-        Acc. real: {acc_real}
-        Acc. fake: {acc_fake} (of {n} samples)
-        '''
-
-        with open(path.join(self.output_path, self.model_name, 'outputs', 'evaluation', 'epoch_metadata.txt'), 'a+') as metadata_file:
-            metadata_file.write(eval_string)
-        print(eval_string)
+        with open(path.join(self.output_path, self.model_name, 'outputs', 'evaluation', 'metrics.csv'), 'a+') as metrics_file:
+            writer = csv.writer(metrics_file, delimiter=',')
+            writer.writerow(eval_row)
+        print(f"[Batch {batch_id}:]\n"
+              f"Time since start of session: {timestamp - init_time}\n"
+              f"Discriminator real loss: {losses[0]}\n"
+              f"Discriminator fake loss: {losses[1]}\n"
+              f"Gan fitting loss: {losses[2]}\n"
+              f"Metrics logged to csv file.")
 
         metadata_list.append(
             [
