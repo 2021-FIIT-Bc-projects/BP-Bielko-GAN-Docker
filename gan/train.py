@@ -3,7 +3,7 @@ output_path = "."
 from src.dcgan_models import *
 
 
-model_name = int(input("Model name (e.g. gan_128): "))
+model_name = input("Model name (e.g. gan_128): ")
 current = int(input("Current epoch: "))
 goal = int(input("Goal epoch: "))
 save_step = int(input("Save each <> epochs: "))
@@ -35,11 +35,6 @@ gan = GAN(generator, discriminator, height=height, width=width, model_name=model
 
 
 
-open(f'{output_path}/{model_name}/outputs/evaluation/epoch_metadata.txt', 'a').close()
-metadata_list = []
-
-
-
 
 print("Running...")
 
@@ -58,7 +53,7 @@ while current < goal:
     
     a = datetime.datetime.now()
     
-    gan.train_gan(dataset_size, metadata_list,
+    gan.train_gan(dataset_size,
                     n_dim=100, start_epoch=from_epoch, n_epochs=to_epoch,
                     n_batch=dataset_size//700, n_eval=50, eval_samples=100, n_plot=200, plot_size=9, disable_plot=True)
     

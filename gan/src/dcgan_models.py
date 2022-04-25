@@ -252,7 +252,7 @@ class Discriminator:
 
             with Image.open(full_path) as image:
                 image_array = np.array(image)
-            image_array = resize(image_array, (self.height, self.width))
+            image_array = np.resize(image_array, (self.height, self.width))
             picked_sample_list.append(image_array)
 
         # after loading n samples:
