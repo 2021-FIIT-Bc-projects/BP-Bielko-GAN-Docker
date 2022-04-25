@@ -161,6 +161,7 @@ class Discriminator:
         self.dataset_type = dataset_type
         self.height = default_height
         self.width = default_width
+        self.pixel_depth = pixel_depth
 
 
         self.model = Sequential()
@@ -252,7 +253,7 @@ class Discriminator:
 
             with Image.open(full_path) as image:
                 image_array = np.array(image)
-            image_array = np.resize(image_array, (self.height, self.width, pixel_depth))
+            image_array = np.resize(image_array, (self.height, self.width, self.pixel_depth))
             picked_sample_list.append(image_array)
 
         # after loading n samples:
