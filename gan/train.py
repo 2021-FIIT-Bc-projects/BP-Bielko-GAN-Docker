@@ -3,12 +3,14 @@ output_path = "."
 from src.dcgan_models import *
 
 
+model_name = int(input("Model name (e.g. gan_128): "))
+current = int(input("Current epoch: "))
+goal = int(input("Goal epoch: "))
+save_step = int(input("Save each <> epochs: "))
 
 
 
 # model definitions
-
-model_name = "dcgan_128_test_64units"
 
 p_dims = 100
 p_n = 100
@@ -39,9 +41,6 @@ metadata_list = []
 
 
 
-current = int(input("Current epoch: "))
-goal = int(input("Goal epoch: "))
-save_step = int(input("Save each <> epochs: "))
 print("Running...")
 
 if current != 0:
