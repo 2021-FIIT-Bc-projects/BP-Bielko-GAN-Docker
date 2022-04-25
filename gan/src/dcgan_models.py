@@ -2,6 +2,7 @@
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, \
                                     Conv2D, \
+                                    ReLU, \
                                     LeakyReLU, \
                                     Dropout, \
                                     Flatten, \
@@ -16,15 +17,12 @@ from tensorflow.keras.applications.inception_v3 import preprocess_input
 
 from os import stat, mkdir, path, listdir, remove
 
-import datetime # testing
+import datetime  # testing
 import numpy as np
 import math
 from matplotlib import pyplot as plt
-from skimage.transform import resize
 import random
 from PIL import Image
-
-import csv
 
 #dataset_path = "/content/ffhq-dataset/thumbnails128x128"
 #output_path = "/content/drive/My Drive/gan_files"
@@ -69,7 +67,7 @@ class GAN:
         
 
     
-    def eval_performance(self, losses, metadata_list, init_time,
+    def eval_performance(self, losses, init_time,
                      n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9):
         
         # x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
@@ -101,17 +99,6 @@ class GAN:
               f"Gan fitting loss: {losses[2]}\n"
               f"Metrics logged to csv file.")
 
-        metadata_list.append(
-            [
-                i_epoch * n_batches + i_batch,  # poradove cislo batch
-                losses[0],
-                losses[1],
-                losses[2],
-                acc_real,
-                acc_fake
-            ]
-        )
-
         if i_batch % n_plot == 0:
             # n_factor = math.sqrt(n)
             fig = generate_and_plot(self.generator, n_dim, inputs, plot_size)
@@ -128,9 +115,9 @@ class GAN:
         return
 
 
-    def train_gan(self, dataset_size, metadata_list,
+    def train_gan(self, dataset_size,
                   n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
-                  plot_size=9, type='face'):
+                  plot_size=9, type='face', disable_plot=False):
         # diskriminator updatujeme so vstupmi v pocte n_batch, pol. real, pol. fake
         half_batch = n_batch // 2
         batches = dataset_size // half_batch
@@ -159,15 +146,17 @@ class GAN:
                 if i % n_eval == 0:
                     losses = (d_loss_real, d_loss_fake, g_loss)
                     inputs = random_latent_points(n_dim, plot_size)
-                    self.eval_performance(losses, metadata_list, init_time,
+                    self.eval_performance(losses, init_time,
                                      n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot,
-                                     plot_size=plot_size)
+                                     plot_size=plot_size, disable_plot=disable_plot)
 
                 start_n += half_batch
 
 
 class Discriminator:
     def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path='', dataset_type='face'):
+        # edit kernel size, layer sizes, bigger dropouts, default alpha on relu
+
         self.dataset_path = dataset_path
         self.dataset_type = dataset_type
         self.height = default_height
@@ -176,49 +165,45 @@ class Discriminator:
 
         self.model = Sequential()
         first_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
-            filters=n_filters,
-            kernel_size=(3, 3),  # ^^
+            filters=n_filters / 2,
+            kernel_size=(5, 5),  # ^^
             strides=(2, 2),
             padding='same',
             input_shape=(self.height, self.width, pixel_depth)
         )
         first_activation = LeakyReLU(alpha=0.2)
-        first_dropout = Dropout(0.1)
+        first_dropout = Dropout(0.3)
 
         self.model.add(first_layer)
         self.model.add(first_activation)
         self.model.add(first_dropout)
 
         current_size = self.height // 2
-        filters_multiplier = 1
 
         while current_size > 4:
             new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
-                filters=n_filters * filters_multiplier,
-                kernel_size=(3, 3),  # ^^
+                filters=n_filters,
+                kernel_size=(5, 5),  # ^^
                 strides=(2, 2),
                 padding='same'
             )
             new_activation = LeakyReLU(alpha=0.2)
-            new_dropout = Dropout(0.1)
+            new_dropout = Dropout(0.3)
 
             self.model.add(new_layer)
             self.model.add(new_activation)
             self.model.add(new_dropout)
 
             current_size /= 2
-            filters_multiplier *= 2
 
 
         flatten = Flatten()
-        dropout = Dropout(0.4)
         output_dense = Dense(
             units=1,  # real/fake klasifikacia
             activation='sigmoid'
         )
 
         self.model.add(flatten)
-        self.model.add(dropout)
         self.model.add(output_dense)
 
         # model.summary()
@@ -332,7 +317,7 @@ class Discriminator:
 
 class Generator:
 
-    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=128, pixel_depth=3, init_size=8):
+    def __init__(self, default_height, default_width, n_dim=100, n_paralell_samples=64, pixel_depth=3, init_size=8):
         #changes:
         # leakyrelu to default alpha, use_bias=False, added batch norms, kernel size to 5, add initial conv2dtransp
         # dense size 128 -> 256, first conv 128, then all 64
@@ -344,45 +329,45 @@ class Generator:
         first_layer = Dense(
             units=init_size * init_size * 256,
             input_dim=n_dim,
-            use_bias=False,
+            # use_bias=False,
             # activation='linear'
         )
-        first_norm = BatchNormalization()
+        # first_norm = BatchNormalization()
         first_activation = LeakyReLU()
         reshape = Reshape((init_size, init_size, 256))
 
-        init_conv = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-            filters=n_paralell_samples,
-            kernel_size=(5, 5),
-            strides=(1, 1),
-            padding='same',
-            use_bias=False
-        )
-        init_norm = BatchNormalization()
-        init_activation = LeakyReLU()
+        #init_conv = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
+        #    filters=n_paralell_samples,
+        #    kernel_size=(5, 5),
+        #    strides=(1, 1),
+        #    padding='same',
+            # use_bias=False
+        #)
+        # init_norm = BatchNormalization()
+        #init_activation = LeakyReLU()
 
         self.model.add(first_layer)
-        self.model.add(first_norm)
+        # self.model.add(first_norm)
         self.model.add(first_activation)
         self.model.add(reshape)
-        self.model.add(init_conv)
-        self.model.add(init_norm)
-        self.model.add(init_activation)
+        #self.model.add(init_conv)
+        # self.model.add(init_norm)
+        #self.model.add(init_activation)
 
         current_size = init_size
         while current_size < self.height:
             new_layer = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
-                filters=n_paralell_samples / 2,
+                filters=n_paralell_samples,
                 kernel_size=(5, 5),
                 strides=(2, 2),
                 padding='same',
-                use_bias=False
+                # use_bias=False
             )
-            new_norm = BatchNormalization()
+            # new_norm = BatchNormalization()
             new_activation = LeakyReLU()
 
             self.model.add(new_layer)
-            self.model.add(new_norm)
+            # self.model.add(new_norm)
             self.model.add(new_activation)
             current_size *= 2
 
@@ -391,7 +376,7 @@ class Generator:
             kernel_size=(3, 3),
             activation='tanh',  # specialna akt. funk. pre rgb
             padding='same',
-            use_bias=False
+            # use_bias=False
         )
         self.model.add(output_layer)
 
@@ -440,14 +425,15 @@ def generate_and_plot(generator, n_dim, inputs, n):
 def latent_transition(pointA, pointB, n_dim=100, n_steps=100):
     transition_points = np.empty([n_steps, n_dim])
 
-
     for i in range(n_steps):
-        step = (-math.cos(i / n_steps * math.pi) * 0.5 + 0.5)
+        step = (-math.cos(i / n_steps * math.pi) * 0.5 + 0.5)  # input value (t) for interp
 
         for dim in range(n_dim):
-            transition_points[i][dim] = (pointB[dim] - pointA[dim]) * step + pointA[dim]
+            transition_points[i][dim] = (pointB[dim] - pointA[dim]) * step + pointA[dim]  # cosine interpolation
 
     return transition_points
+
+
 
 
 def fid_init(resolution):
@@ -503,3 +489,145 @@ def calculate_inception_score(images, n_split=10, eps=1E-16):
     # average across images
     is_avg, is_std = np.mean(scores), np.std(scores)
     return is_avg, is_std
+
+    
+class Encoder:
+    def __init__(self, default_width, default_height, n_filters=64, pixel_depth=3, dataset_path='', dataset_type='face'):
+        self.dataset_path = dataset_path
+        self.dataset_type = dataset_type
+        self.height = default_height
+        self.width = default_width
+         
+        self.model = Sequential()
+         
+        first_layer = Conv2D(
+            filters=n_filters,
+            kernel_size=(5, 5),
+            strides=(2, 2),
+            padding='same',
+            input_shape=(self.height, self.width, pixel_depth),
+            activation='relu',
+        )
+
+        self.model.add(first_layer)
+
+        current_size = self.height // 2
+         
+        while current_size > 4:
+            new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
+                filters=n_filters,
+                kernel_size=(5, 5),  # ^^
+                strides=(2, 2),
+                padding='same',
+                activation='relu',
+            )
+        
+            self.model.add(new_layer)      
+            current_size /= 2
+         
+         
+        flatten = Flatten()
+        output_dense = Dense(
+            units=100,  # result vector
+            activation='relu',
+        )
+
+        self.model.add(flatten)
+        self.model.add(output_dense)
+
+        # model.summary()
+        # adam = Adam(lr=0.001, beta_1=0.8)
+        # self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics='accuracy')
+    
+    
+    def generate_real_face_samples(self, i_start, n, dataset_path="dataset_download/thumbnails128x128"):
+        picked_sample_list = list()
+        for i_image in range(i_start, i_start + n):
+            chosen_sample = i_image
+            chosen_folder = chosen_sample - (chosen_sample % 1000)
+
+            folder_string = str(chosen_folder)
+            image_string = str(chosen_sample)
+            folder_string = folder_string.rjust(5, '0')  # padding
+            image_string = image_string.rjust(5, '0')  # padding
+
+            full_path = path.join(self.dataset_path, folder_string, image_string + '.png')
+
+            with Image.open(full_path) as image:
+                image_array = np.array(image)
+            image_array = resize(image_array, (self.height, self.width))
+            picked_sample_list.append(image_array)
+
+        # after loading n samples:
+        X = np.array(picked_sample_list)
+        y = np.ones((n, 1))
+        return X, y
+    
+    
+class FMAE:
+    def __init__(self, encoder, generator, height, width):
+
+        self.height = height
+        self.width = width
+        
+        generator.model.trainable = False
+        self.model = Sequential()
+    
+        self.model.add(encoder.model)
+        self.model.add(generator.model)
+    
+        self.model.layers[0]._name = 'Encoder'
+        self.model.layers[1]._name = 'Generator'
+    
+        adam = Adam()
+        self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics='accuracy')
+        
+        self.encoder = encoder
+        self.generator = generator
+        
+        
+    def train_fmae(self, input_image, n_steps):
+
+        init_time = datetime.datetime.now()
+
+        for epoch in range(0, n_steps):
+            
+            if epoch % 100 == 0:
+                print("Epoch", epoch)
+                decoded_image = self.model.predict(input_image)
+                fig = plt.imshow(decoded_image[0], interpolation='nearest')
+                plt.show(fig)
+                plt.close()
+            
+            self.model.fit(input_image, input_image, verbose=0)
+                
+                
+                
+    def train_fmae_on_dataset(self, input_image, n_steps):
+     
+            init_time = datetime.datetime.now()
+     
+            for epoch in range(0, n_steps):
+                print("Epoch", epoch)
+                
+                for step in range(0, 70000, 100):
+                    
+                    if step % 1000 == 0:
+                        print(step)
+                        real_image, _ = self.encoder.generate_real_face_samples(step, 1, dataset_path="dataset_download/thumbnails128x128")
+                        decoded_real_image = self.model.predict(real_image)
+                        decoded_input_image = self.model.predict(input_image)
+                        fig = plt.imshow(decoded_real_image[0], interpolation='nearest')
+                        plt.show(fig)
+                        plt.close()
+                        fig = plt.imshow(decoded_input_image[0], interpolation='nearest')
+                        plt.show(fig)
+                        plt.close()
+                    
+                    samples, _ = self.encoder.generate_real_face_samples(step, 100, dataset_path="dataset_download/thumbnails128x128")
+                    self.model.fit(samples, samples, verbose=0)
+                
+            
+            
+        
+    
