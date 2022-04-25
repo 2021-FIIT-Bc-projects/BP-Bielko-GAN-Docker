@@ -98,9 +98,11 @@ class GAN:
               f"Discriminator real loss: {losses[0]}\n"
               f"Discriminator fake loss: {losses[1]}\n"
               f"Gan fitting loss: {losses[2]}\n"
+              f"Real accuracy: {acc_real}\n"
+              f"Fake accuracy: {acc_fake}\n"
               f"Metrics logged to csv file.")
 
-        if disable_plot == False and i_batch % n_plot == 0:
+        if i_batch % n_plot == 0:
             # n_factor = math.sqrt(n)
             fig = generate_and_plot(self.generator, n_dim, inputs, plot_size)
             epoch_padding_size = 8  # len(str(n_epochs-1))
@@ -108,7 +110,8 @@ class GAN:
             filename = path.join(self.output_path, self.model_name, "outputs", f"output_epoch_{str(i_epoch).rjust(epoch_padding_size, '0')}_" \
                        f"{str(i_batch).rjust(batch_padding_size, '0')}.png")
             fig.savefig(filename)
-            plt.show(fig)
+            if disable_plot == False:
+                plt.show(fig)
             plt.close(fig)
 
 
