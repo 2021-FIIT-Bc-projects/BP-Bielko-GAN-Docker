@@ -23,6 +23,7 @@ import math
 from matplotlib import pyplot as plt
 import random
 from PIL import Image
+from skimage.transform import resize
 import csv  # for logging
 
 #dataset_path = "/content/ffhq-dataset/thumbnails128x128"
@@ -31,6 +32,7 @@ import csv  # for logging
 class GAN:
     def __init__(self, generator, discriminator, height=64, width=64, model_name="dcgan_tanh_x64", output_path="", dataset_size=70000):
         self.dataset_size = dataset_size
+        self.batch_size = None
     
         model_directory = path.join(output_path, model_name)
         try:
@@ -72,7 +74,7 @@ class GAN:
                      n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9, disable_plot=False):
         
         # x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
-        x_real, y_real = self.discriminator.generate_real_samples(0, n, type=self.discriminator.dataset_type)
+        x_real, y_real = self.discriminator.generate_real_samples(i_batch * self.batch_size, n, type=self.discriminator.dataset_type)
         _, acc_real = self.discriminator.model.evaluate(x_real, y_real, verbose=0)
 
         input_points = random_latent_points(n_dim, n)
@@ -123,6 +125,7 @@ class GAN:
                   n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
                   plot_size=9, type='face', disable_plot=False):
         # diskriminator updatujeme so vstupmi v pocte n_batch, pol. real, pol. fake
+        self.batch_size = n_batch
         half_batch = n_batch // 2
         batches = dataset_size // half_batch
 
@@ -170,7 +173,7 @@ class Discriminator:
 
         self.model = Sequential()
         first_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
-            filters=n_filters / 2,
+            filters=n_filters,
             kernel_size=(5, 5),  # ^^
             strides=(2, 2),
             padding='same',
@@ -187,7 +190,7 @@ class Discriminator:
 
         while current_size > 4:
             new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
-                filters=n_filters,
+                filters=n_filters / 2,
                 kernel_size=(5, 5),  # ^^
                 strides=(2, 2),
                 padding='same'
@@ -257,7 +260,7 @@ class Discriminator:
 
             with Image.open(full_path) as image:
                 image_array = np.array(image)
-            image_array = np.resize(image_array, (self.height, self.width, self.pixel_depth))
+            image_array = resize(image_array, (self.height, self.width))
             picked_sample_list.append(image_array)
 
         # after loading n samples:
