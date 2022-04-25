@@ -23,6 +23,7 @@ import math
 from matplotlib import pyplot as plt
 import random
 from PIL import Image
+import csv  # for logging
 
 #dataset_path = "/content/ffhq-dataset/thumbnails128x128"
 #output_path = "/content/drive/My Drive/gan_files"
