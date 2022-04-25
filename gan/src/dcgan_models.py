@@ -68,7 +68,7 @@ class GAN:
 
     
     def eval_performance(self, losses, init_time,
-                     n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9):
+                     n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9, disable_plot=False):
         
         # x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
         x_real, y_real = self.discriminator.generate_real_samples(0, n, type=self.discriminator.dataset_type)
@@ -99,7 +99,7 @@ class GAN:
               f"Gan fitting loss: {losses[2]}\n"
               f"Metrics logged to csv file.")
 
-        if i_batch % n_plot == 0:
+        if disable_plot == False and i_batch % n_plot == 0:
             # n_factor = math.sqrt(n)
             fig = generate_and_plot(self.generator, n_dim, inputs, plot_size)
             epoch_padding_size = 8  # len(str(n_epochs-1))
