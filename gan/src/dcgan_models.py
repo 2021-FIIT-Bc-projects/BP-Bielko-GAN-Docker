@@ -14,7 +14,6 @@ from tensorflow.keras import initializers, optimizers
 from tensorflow.keras.applications.inception_v3 import InceptionV3
 from tensorflow.keras.applications.inception_v3 import preprocess_input
 
-
 from os import stat, mkdir, path, listdir, remove
 
 import datetime  # testing
@@ -30,7 +29,7 @@ import csv  # for logging
 #output_path = "/content/drive/My Drive/gan_files"
 
 class GAN:
-    def __init__(self, generator, discriminator, height=64, width=64, model_name="dcgan_tanh_x64", output_path="", dataset_size=70000):
+    def __init__(self, generator, discriminator, height=64, width=64, model_name="dcgan_tanh_x64", output_path="", dataset_size=70000, inputs=None, lr=0.0002):
         self.dataset_size = dataset_size
         self.batch_size = None
     
@@ -58,11 +57,13 @@ class GAN:
         self.model.layers[0]._name = 'Generator'
         self.model.layers[1]._name = 'Discriminator'
     
-        adam = Adam(lr=0.0002, beta_1=0.5)
+        adam = Adam(learning_rate=lr, beta_1=0.5)
         self.model.compile(loss='binary_crossentropy', optimizer=adam)
         
         self.generator = generator
         self.discriminator = discriminator
+        
+        self.inputs = inputs;
 
 
     def make_inception(self):
@@ -71,10 +72,11 @@ class GAN:
 
     
     def eval_performance(self, losses, init_time,
-                     n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=25, n_plot=10, plot_size=9, disable_plot=False):
+                     n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=100, n_plot=10, plot_size=9, disable_plot=False):
         
         # x_real, y_real = self.discriminator.generate_real_samples_random(n, 0, self.dataset_size)
-        x_real, y_real = self.discriminator.generate_real_samples(i_batch * self.batch_size, n, type=self.discriminator.dataset_type)
+        
+        x_real, y_real = self.discriminator.generate_real_samples_random(n, type=self.discriminator.dataset_type)
         _, acc_real = self.discriminator.model.evaluate(x_real, y_real, verbose=0)
 
         input_points = random_latent_points(n_dim, n)
@@ -122,7 +124,7 @@ class GAN:
 
 
     def train_gan(self, dataset_size,
-                  n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=64, n_plot=10,
+                  n_dim=100, start_epoch=0, n_epochs=100, n_batch=128, n_eval=2000, eval_samples=100, n_plot=10,
                   plot_size=9, type='face', disable_plot=False):
         # diskriminator updatujeme so vstupmi v pocte n_batch, pol. real, pol. fake
         self.batch_size = n_batch
@@ -152,7 +154,12 @@ class GAN:
 
                 if i % n_eval == 0:
                     losses = (d_loss_real, d_loss_fake, g_loss)
-                    inputs = random_latent_points(n_dim, plot_size)
+                    
+                    if self.inputs.any() == None:
+                        inputs = random_latent_points(n_dim, plot_size)
+                    else:
+                        inputs = self.inputs
+                        
                     self.eval_performance(losses, init_time,
                                      n_dim, epoch, n_epochs, i, batches, inputs, n=eval_samples, n_plot=n_plot,
                                      plot_size=plot_size, disable_plot=disable_plot)
@@ -161,7 +168,7 @@ class GAN:
 
 
 class Discriminator:
-    def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path='', dataset_type='face'):
+    def __init__(self, default_width, default_height, n_filters=128, pixel_depth=3, dataset_path='', dataset_type='face', lr=0.0002):
         # edit kernel size, layer sizes, bigger dropouts, default alpha on relu
 
         self.dataset_path = dataset_path
@@ -215,35 +222,9 @@ class Discriminator:
         self.model.add(output_dense)
 
         # model.summary()
-        adam = Adam(lr=0.0002, beta_1=0.5)
+        adam = Adam(learning_rate=lr, beta_1=0.5)
         self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics=['accuracy'])  # metrics kvoli evaluation
 
-    #def generate_real_samples(self, n):
-    #    # FINISH
-    #
-    #    picked_sample_list = list()
-    #    for i_image in range(i_start, i_start + n):
-    #        chosen_sample = i_image
-    #        chosen_folder = chosen_sample - (chosen_sample % 1000)
-    #
-    #        folder_string = str(chosen_folder)
-    #        image_string = str(chosen_sample)
-    #        folder_string = folder_string.rjust(5, '0')  # padding
-    #        image_string = image_string.rjust(5, '0')  # padding
-    #
-    #        full_path = dataset_path + '/' + folder_string + '/' + image_string + '.png'
-    #
-    #        with Image.open(full_path) as image:
-    #            image_array = np.array(image)
-    #        image_array = resize(image_array, (default_height, default_width))
-    #
-    #        real_sample_dict[chosen_sample] = image_array
-    #
-    #        picked_sample_list.append(image_array)
-    #
-    #    X = self.real_gen.flow_from_directory(self.dataset_path, class_mode=None, batch_size=n)
-    #    y = np.ones((n, 1))
-    #    return X,y
 
     def generate_real_face_samples(self, i_start, n):
         picked_sample_list = list()
@@ -296,13 +277,12 @@ class Discriminator:
         elif type == 'avatar':
             loader = self.generate_real_avatar_samples
         return loader(i_start, n)
-
-
-    def generate_real_samples_random(self, n, i_min, i_max):
+        
+    
+    def generate_real_face_random(self, n, i_min=0, i_max=70000):
         picked_sample_list = list()
         for i_image in range(n):
             chosen_sample = random.choice(range(i_min, i_max))
-
             chosen_folder = chosen_sample - (chosen_sample % 1000)
 
             folder_string = str(chosen_folder)
@@ -316,11 +296,39 @@ class Discriminator:
                 image_array = np.array(image)
             image_array = resize(image_array, (self.height, self.width))
             picked_sample_list.append(image_array)
-
-        # after loading n samples:
-        X = np.array(picked_sample_list)  # .reshape(n, 1)
+        X = np.array(picked_sample_list)
         y = np.ones((n, 1))
         return X, y
+            
+            
+    def generate_real_avatar_random(self, n):
+        picked_sample_list = list()
+        files = listdir(self.dataset_path)
+        for i_image in range(n):
+            chosen_sample = random.choice(range(0, len(files)))
+            file = files[chosen_sample]
+            with Image.open(path.join(self.dataset_path, file)) as image:
+                background = Image.new('RGBA', image.size, (255,255,255))
+                alpha_composite = Image.alpha_composite(background, image).convert('RGB')
+                image_array = np.array(alpha_composite)
+
+                # exclude alpha channel
+            image_array = resize(image_array, (self.height, self.width))
+            picked_sample_list.append(image_array)
+
+        # after loading n samples:
+        X = np.array(picked_sample_list)
+        y = np.ones((n, 1))
+        return X, y
+
+
+    def generate_real_samples_random(self, n, i_min=0, i_max=70000, type='face'):
+        loader = None
+        if type == 'face':
+            loader = self.generate_real_face_random
+        elif type == 'avatar':
+            loader = self.generate_real_avatar_random
+        return loader(n)
 
 
 class Generator:
@@ -366,7 +374,7 @@ class Generator:
         while current_size < self.height:
             new_layer = Conv2DTranspose(  # alternativne UpSample2D + Conv2D, zvacsenie a domyslenie, toto ich spaja do 1
                 filters=n_paralell_samples,
-                kernel_size=(5, 5),
+                kernel_size=(4, 4),
                 strides=(2, 2),
                 padding='same',
                 # use_bias=False
@@ -542,10 +550,6 @@ class Encoder:
 
         self.model.add(flatten)
         self.model.add(output_dense)
-
-        # model.summary()
-        # adam = Adam(lr=0.001, beta_1=0.8)
-        # self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics='accuracy')
     
     
     def generate_real_face_samples(self, i_start, n, dataset_path="dataset_download/thumbnails128x128"):
