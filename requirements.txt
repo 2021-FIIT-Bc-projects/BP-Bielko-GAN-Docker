@@ -1,5 +1,8 @@
 tensorflow==2.6.2
-numpy
-matplotlib
-scikit-image
+numpy 
+matplotlib 
+scikit-image 
 Pillow
+csv
+imageio
+autocrop

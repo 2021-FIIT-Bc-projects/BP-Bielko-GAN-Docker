@@ -11,8 +11,6 @@ from tensorflow.keras.layers import Dense, \
                                     BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import initializers, optimizers
-from tensorflow.keras.applications.inception_v3 import InceptionV3
-from tensorflow.keras.applications.inception_v3 import preprocess_input
 
 from os import stat, mkdir, path, listdir, remove
 
@@ -65,11 +63,6 @@ class GAN:
         
         self.inputs = inputs;
 
-
-    def make_inception(self):
-        self.inception = InceptionV3()
-        
-
     
     def eval_performance(self, losses, init_time,
                      n_dim, i_epoch, n_epochs, i_batch, n_batches, inputs, n=100, n_plot=10, plot_size=9, disable_plot=False):
@@ -117,10 +110,6 @@ class GAN:
             if disable_plot == False:
                 plt.show(fig)
             plt.close(fig)
-
-
-    def inception_eval(self):
-        return
 
 
     def train_gan(self, dataset_size,
@@ -250,32 +239,14 @@ class Discriminator:
         return X, y
 
 
-    def generate_real_avatar_samples(self, i_start, n):
-        picked_sample_list = list()
-        files = listdir(self.dataset_path)[i_start : i_start + n]
-
-        for file in files:
-            with Image.open(path.join(self.dataset_path, file)) as image:
-                background = Image.new('RGBA', image.size, (255,255,255))
-                alpha_composite = Image.alpha_composite(background, image).convert('RGB')
-                image_array = np.array(alpha_composite)
-
-                # exclude alpha channel
-            image_array = resize(image_array, (self.height, self.width))
-            picked_sample_list.append(image_array)
-
-        # after loading n samples:
-        X = np.array(picked_sample_list)
-        y = np.ones((n, 1))
-        return X, y
-
 
     def generate_real_samples(self, i_start, n, type='face'):
         loader = None
         if type == 'face':
             loader = self.generate_real_face_samples
-        elif type == 'avatar':
-            loader = self.generate_real_avatar_samples
+        else:
+            print("Unknown dataset.")
+            return None
         return loader(i_start, n)
         
     
@@ -299,35 +270,15 @@ class Discriminator:
         X = np.array(picked_sample_list)
         y = np.ones((n, 1))
         return X, y
-            
-            
-    def generate_real_avatar_random(self, n):
-        picked_sample_list = list()
-        files = listdir(self.dataset_path)
-        for i_image in range(n):
-            chosen_sample = random.choice(range(0, len(files)))
-            file = files[chosen_sample]
-            with Image.open(path.join(self.dataset_path, file)) as image:
-                background = Image.new('RGBA', image.size, (255,255,255))
-                alpha_composite = Image.alpha_composite(background, image).convert('RGB')
-                image_array = np.array(alpha_composite)
-
-                # exclude alpha channel
-            image_array = resize(image_array, (self.height, self.width))
-            picked_sample_list.append(image_array)
-
-        # after loading n samples:
-        X = np.array(picked_sample_list)
-        y = np.ones((n, 1))
-        return X, y
 
 
     def generate_real_samples_random(self, n, i_min=0, i_max=70000, type='face'):
         loader = None
         if type == 'face':
             loader = self.generate_real_face_random
-        elif type == 'avatar':
-            loader = self.generate_real_avatar_random
+        else:
+            print("Unknown dataset.")
+            return None
         return loader(n)
 
 
@@ -449,63 +400,6 @@ def latent_transition(pointA, pointB, n_dim=100, n_steps=100):
 
     return transition_points
 
-
-
-
-def fid_init(resolution):
-
-    model = InceptionV3(include_top=False, pooling="avg", input_shape=(resolution,resolution,3))
-    return model
-
-
-def fid_eval(sample, fid_model, eps=1E-16): # evaluate FID of a sample or set of samples via a model such as InceptionV3
-
-    sample = sample.astype("float32")
-    sample = inception_v3.preprocess_input(sample)
-
-    prediction = fid_model.predict(sample)
-    p_y = np.expand_dims(prediction.mean(axis=0), 0)
-    kl_d = prediction * (log(prediction + eps) - log(p_y + eps))
-    sum_kl_d = kl_d.sum(axis=1)
-
-
-    return result_fid
-
-
-
-# assumes images have the shape 299x299x3, pixels in [0,255]
-def calculate_inception_score(images, n_split=10, eps=1E-16):
-    # load inception v3 model
-    model = InceptionV3()
-    # convert from uint8 to float32
-    processed = images.astype('float32')
-    # pre-process raw images for inception v3 model
-    processed = preprocess_input(processed)
-    # predict class probabilities for images
-    yhat = model.predict(processed)
-    # enumerate splits of images/predictions
-    scores = list()
-    n_part = np.floor(images.shape[0] / n_split)
-    for i in range(n_split):
-        # retrieve p(y|x)
-        ix_start, ix_end = i * n_part, i * n_part + n_part
-        p_yx = yhat[ix_start:ix_end]
-        # calculate p(y)
-        p_y = np.expand_dims(p_yx.mean(axis=0), 0)
-        # calculate KL divergence using log probabilities
-        kl_d = p_yx * (np.log(p_yx + eps) - np.log(p_y + eps))
-        # sum over classes
-        sum_kl_d = kl_d.sum(axis=1)
-        # average over images
-        avg_kl_d = np.mean(sum_kl_d)
-        # undo the log
-        is_score = np.exp(avg_kl_d)
-        # store
-        scores.append(is_score)
-    # average across images
-    is_avg, is_std = np.mean(scores), np.std(scores)
-    return is_avg, is_std
-
     
 class Encoder:
     def __init__(self, default_width, default_height, n_filters=64, pixel_depth=3, dataset_path='', dataset_type='face'):
@@ -518,7 +412,7 @@ class Encoder:
          
         first_layer = Conv2D(
             filters=n_filters,
-            kernel_size=(5, 5),
+            kernel_size=(4, 4),
             strides=(2, 2),
             padding='same',
             input_shape=(self.height, self.width, pixel_depth),
@@ -532,7 +426,7 @@ class Encoder:
         while current_size > 4:
             new_layer = Conv2D(  # vstupne np polia su sice 3d, ale convolution sa nad nimi robi 2d
                 filters=n_filters,
-                kernel_size=(5, 5),  # ^^
+                kernel_size=(4, 4),  # ^^
                 strides=(2, 2),
                 padding='same',
                 activation='relu',
@@ -540,12 +434,23 @@ class Encoder:
         
             self.model.add(new_layer)      
             current_size /= 2
+            
+        final_layer = Conv2D(
+            filters=256,
+            kernel_size=(4, 4),
+            strides=(1, 1),
+            padding='same',
+            input_shape=(self.height, self.width, pixel_depth),
+            activation='relu',
+        )
+
+        self.model.add(final_layer)
          
          
         flatten = Flatten()
         output_dense = Dense(
             units=100,  # result vector
-            activation='relu',
+            activation='tanh',
         )
 
         self.model.add(flatten)
@@ -577,7 +482,7 @@ class Encoder:
     
     
 class FMAE:
-    def __init__(self, encoder, generator, height, width):
+    def __init__(self, encoder, generator, height, width, lr=0.001):
 
         self.height = height
         self.width = width
@@ -591,7 +496,7 @@ class FMAE:
         self.model.layers[0]._name = 'Encoder'
         self.model.layers[1]._name = 'Generator'
     
-        adam = Adam()
+        adam = Adam(learning_rate=lr, beta_1=0.5)
         self.model.compile(loss='binary_crossentropy', optimizer=adam, metrics='accuracy')
         
         self.encoder = encoder
@@ -615,30 +520,45 @@ class FMAE:
                 
                 
                 
-    def train_fmae_on_dataset(self, input_image, n_steps):
+    def train_fmae_on_dataset(self, input_image, n_epochs, dataset_size=70000, batch_size=100, n_eval=100, plot_size=10, disable_plot=False):
+    
+            
      
             init_time = datetime.datetime.now()
+            
+            n_batches = dataset_size // batch_size
      
-            for epoch in range(0, n_steps):
+            for epoch in range(0, n_epochs):
+                start_n = 0
                 print("Epoch", epoch)
                 
-                for step in range(0, 70000, 100):
+                for batch in range(0, n_batches):
                     
-                    if step % 1000 == 0:
-                        print(step)
-                        real_image, _ = self.encoder.generate_real_face_samples(step, 1, dataset_path="dataset_download/thumbnails128x128")
+                    samples, _ = self.encoder.generate_real_face_samples(start_n, batch_size, dataset_path="dataset_download/thumbnails128x128")
+                    #inputs = random_latent_points(100, batch_size)
+                    #samples_, _ = self.generator.generate_fake_samples(inputs, 100, batch_size)
+                    self.model.fit(samples, samples, verbose=0)
+                    
+                    if batch % n_eval == 0:
+                        print("Batch", batch)
+                        # filename = path.join(self.output_path, self.model_name, "outputs", f"output_epoch_{str(epoch).rjust(5, '0')}_" \
+                        # f"{str(batch).rjust(5, '0')}.png")
+                        real_image, _ = self.encoder.generate_real_face_samples(start_n, 1, dataset_path="dataset_download/thumbnails128x128")
                         decoded_real_image = self.model.predict(real_image)
                         decoded_input_image = self.model.predict(input_image)
+                        
+                    
                         fig = plt.imshow(decoded_real_image[0], interpolation='nearest')
-                        plt.show(fig)
+                        if disable_plot == False:
+                            plt.show(fig)
+                        
                         plt.close()
                         fig = plt.imshow(decoded_input_image[0], interpolation='nearest')
-                        plt.show(fig)
+                        if disable_plot == False:
+                            plt.show(fig)
                         plt.close()
                     
-                    samples, _ = self.encoder.generate_real_face_samples(step, 100, dataset_path="dataset_download/thumbnails128x128")
-                    self.model.fit(samples, samples, verbose=0)
-                
+                    start_n += batch_size
             
             
         
